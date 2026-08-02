@@ -2,21 +2,21 @@
 //  UTILS - Funções utilitárias
 // ============================================================
 const Utils = {
-    formatTime(seconds) {
-        const m = Math.floor(seconds / 60);
-        const s = Math.floor(seconds % 60);
-        return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    formatTime: function(seconds) {
+        var m = Math.floor(seconds / 60);
+        var s = Math.floor(seconds % 60);
+        return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
     },
-    dist(x1, y1, x2, y2) {
+    dist: function(x1, y1, x2, y2) {
         return Math.abs(x1 - x2) + Math.abs(y1 - y2);
     },
-    rand(min, max) {
+    rand: function(min, max) {
         return Math.random() * (max - min) + min;
     },
-    randInt(min, max) {
+    randInt: function(min, max) {
         return Math.floor(this.rand(min, max + 1));
     },
-    lerp(a, b, t) {
-        return a + (b - a) * t;
+    clamp: function(val, min, max) {
+        return Math.max(min, Math.min(max, val));
     }
 };
