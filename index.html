@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>LabirintiON – A Saga</title>
+    <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div id="gameWrapper">
+    <!-- MENU -->
+    <div id="menu">
+        <div class="maze-bg"></div>
+        <h1>🏛️ LABIRINTION</h1>
+        <p class="subtitle">⚔️ Escolha seu herói e derrote o Vilão!</p>
+        <button class="hero-btn" data-hero="0">🐱 Benício (Veloz)</button>
+        <button class="hero-btn" data-hero="1">🦁 Joaquim (Fortão)</button>
+        <button class="hero-btn" data-hero="2">🐉 Pedro (Dash)</button>
+        <p style="margin-top:20px; font-size:0.9rem; color:#888;">
+            💡 Pegue pedras para quebrar o escudo do Vitrolan e capture-o!
+        </p>
+        <p style="font-size:0.8rem; color:#555;">Melhor tempo: <span id="bestTimeDisplay">--</span></p>
+        <p style="font-size:0.8rem; color:#f9d56e;">Moedas: <span id="coinDisplay">0</span></p>
+        <button id="shopMenuBtn" style="background:#f39c12; border:none; border-radius:30px; padding:8px 25px; color:white; font-weight:bold; margin-top:10px; cursor:pointer;">🛒 Loja</button>
+    </div>
+
+    <!-- JOGO -->
+    <div id="gameArea" class="hide">
+        <div id="ui">
+            <span id="heroName">👤 Herói</span>
+            <span id="lives">❤️❤️❤️</span>
+            <span id="heartbeat">❤️</span>
+            <span id="statusDisplay">☁️ Fechado</span>
+            <span id="stoneCount">💎 0</span>
+            <span id="timerDisplay">⏱️ 00:00</span>
+            <span id="levelHud">Nível 1</span>
+            <div id="vulnerabilityBar">
+                <div id="vulnerabilityFill"></div>
+            </div>
+        </div>
+        <div id="storyText" class="hide"></div>
+        <canvas id="gameCanvas" width="500" height="500"></canvas>
+        <div id="controls">
+            <button class="empty"></button>
+            <button id="btnUp">⬆️</button>
+            <button class="empty"></button>
+            <button id="btnLeft">⬅️</button>
+            <button id="btnDown">⬇️</button>
+            <button id="btnRight">➡️</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL RESULTADO -->
+<div id="resultModal" class="hide">
+    <div class="content">
+        <h2 id="resultTitle">🏆 Vitória!</h2>
+        <div class="score" id="resultScore">⭐ 0</div>
+        <div class="stats" id="resultStats"></div>
+        <div class="stats bestTime" id="resultBestTime"></div>
+        <div class="stats" id="resultCoins">🪙 +0 moedas</div>
+        <button id="nextLevelBtn">Próximo Nível</button>
+        <button id="restartGameBtn" style="background:#555; margin-left:10px;">Recomeçar</button>
+    </div>
+</div>
+
+<!-- MODAL LOJA -->
+<div id="shopModal" class="hide">
+    <div class="content">
+        <h2>🛒 Loja de Skins</h2>
+        <p>Moedas: <span id="shopCoins">0</span></p>
+        <div id="shopItems"></div>
+        <button class="close" id="closeShop">Fechar</button>
+    </div>
+</div>
+
+<!-- MODAL JOGO COMPLETO -->
+<div id="completeModal" class="hide">
+    <div class="content">
+        <h2>🎉 PARABÉNS!</h2>
+        <p style="font-size:1.5rem;">Você completou todos os níveis!</p>
+        <div class="score" id="finalScore">⭐ 0</div>
+        <div class="stats" id="finalStats"></div>
+        <button id="completeRestartBtn" style="background:#f1c40f; color:#1a1a2e; margin-top:20px;">Jogar Novamente</button>
+    </div>
+</div>
+
+<script src="js/utils.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/save.js"></script>
+<script src="js/levels.js"></script>
+<script src="js/maze.js"></script>
+<script src="js/player.js"></script>
+<script src="js/villain.js"></script>
+<script src="js/game.js"></script>
+<script src="js/renderer.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
