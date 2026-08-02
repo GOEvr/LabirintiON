@@ -1,29 +1,25 @@
 // ============================================================
 //  RENDERER - Desenho do jogo
+//  (Inclui: roundRect para cantos arredondados)
 // ============================================================
-const Renderer = {
-    render(game) {
-        const ctx = game.ctx;
-        const canvas = game.canvas;
-        const size = game.currentSize;
-        const cell = canvas.width / size;
+var Renderer = {
+    render: function(game) {
+        var ctx = game.ctx;
+        var canvas = game.canvas;
+        var size = game.currentSize;
+        var cell = canvas.width / size;
 
-        // Limpar tela
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-
         ctx.save();
 
         // Screen shake
         if (game.screenShake > 0) {
-            const intensity = game.screenShake * 15;
-            ctx.translate(
-                (Math.random() - 0.5) * intensity,
-                (Math.random() - 0.5) * intensity
-            );
+            var intensity = game.screenShake * 15;
+            ctx.translate((Math.random() - 0.5) * intensity, (Math.random() - 0.5) * intensity);
         }
 
         // Céu
-        const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+        var grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
         if (game.isSunny) {
             grad.addColorStop(0, '#87CEEB');
             grad.addColorStop(0.6, '#f0e68c');
@@ -37,7 +33,7 @@ const Renderer = {
         // Pássaros
         if (game.isSunny) {
             ctx.fillStyle = '#2c3e50';
-            for (let b of game.birds) {
+            for (var b of game.birds) {
                 ctx.beginPath();
                 ctx.arc(b.x, b.y, 4, 0, 2 * Math.PI);
                 ctx.fill();
@@ -49,22 +45,36 @@ const Renderer = {
             }
         }
 
-        // Labirinto
-        for (let row = 0; row < size; row++) {
-            for (let col = 0; col < size; col++) {
-                if (!game.revealedCells[row]?.[col]) {
+        // ==========================================================
+        //  LABIRINTO
+        //  🆕 6º PASSO: CANTOS ARREDONDADOS (roundRect)
+        // ==========================================================
+        for (var row = 0; row < size; row++) {
+            for (var col = 0; col < size; col++) {
+                var revealed = game.revealedCells[row] && game.revealedCells[row][col];
+                if (!revealed) {
                     ctx.fillStyle = '#0a0a0a';
                     ctx.fillRect(col * cell, row * cell, cell, cell);
                     continue;
                 }
-                const isWall = MazeGenerator.maze[row][col] === 1;
-                if (isWall) {
+
+                if (MazeGenerator.maze[row][col] === 1) {
+                    // Parede com cantos arredondados
                     ctx.fillStyle = '#3a2a1a';
-                    ctx.fillRect(col * cell, row * cell, cell, cell);
+                    ctx.beginPath();
+                    if (ctx.roundRect) {
+                        ctx.roundRect(col * cell, row * cell, cell, cell, 5);
+                    } else {
+                        // Fallback para navegadores sem roundRect
+                        ctx.rect(col * cell, row * cell, cell, cell);
+                    }
+                    ctx.fill();
+
+                    // Musgo (mantido como está)
                     ctx.fillStyle = '#4a7a4a';
-                    for (let i = 0; i < 3; i++) {
-                        const mx = col * cell + Math.random() * cell;
-                        const my = row * cell + Math.random() * cell;
+                    for (var i = 0; i < 3; i++) {
+                        var mx = col * cell + Math.random() * cell;
+                        var my = row * cell + Math.random() * cell;
                         ctx.beginPath();
                         ctx.arc(mx, my, 2, 0, 2 * Math.PI);
                         ctx.fill();
@@ -76,13 +86,16 @@ const Renderer = {
                     ctx.lineTo(col * cell + 6, row * cell + 12);
                     ctx.stroke();
                 } else {
+                    // Chão
                     ctx.fillStyle = game.isSunny ? '#7ec87e' : '#4a7a5a';
                     ctx.fillRect(col * cell, row * cell, cell, cell);
+
                     // Flores
-                    for (let f of game.flowers) {
+                    for (var f of game.flowers) {
                         if (f.x === col && f.y === row && game.isSunny) {
-                            const phase = Math.sin(performance.now() / 1000 + f.phase);
-                            ctx.fillStyle = ['#e74c3c', '#f1c40f', '#9b59b6', '#3498db'][Math.floor(f.phase) % 4];
+                            var phase = Math.sin(performance.now() / 1000 + f.phase);
+                            var colors = ['#e74c3c', '#f1c40f', '#9b59b6', '#3498db'];
+                            ctx.fillStyle = colors[Math.floor(f.phase) % 4];
                             ctx.beginPath();
                             ctx.arc(col * cell + cell / 2 + phase * 3,
                                 row * cell + cell / 2 + Math.cos(performance.now() / 1200 + f.phase) * 3,
@@ -96,8 +109,9 @@ const Renderer = {
                             ctx.fill();
                         }
                     }
+
                     // Espinhos
-                    for (let s of game.spikes) {
+                    for (var s of game.spikes) {
                         if (s.x === col && s.y === row) {
                             ctx.fillStyle = '#e74c3c';
                             ctx.beginPath();
@@ -117,9 +131,9 @@ const Renderer = {
         }
 
         // Portas
-        for (let d of game.doors) {
-            if (!game.revealedCells[d.y]?.[d.x]) continue;
-            const x = d.x * cell, y = d.y * cell;
+        for (var d of game.doors) {
+            if (!game.revealedCells[d.y] || !game.revealedCells[d.y][d.x]) continue;
+            var x = d.x * cell, y = d.y * cell;
             if (!d.open) {
                 ctx.fillStyle = '#8B4513';
                 ctx.fillRect(x + 2, y + 2, cell - 4, cell - 4);
@@ -140,11 +154,11 @@ const Renderer = {
         }
 
         // Pedras do poder
-        for (let s of game.powerStones) {
-            if (!game.revealedCells[s.y]?.[s.x]) continue;
-            const x = s.x * cell + cell / 2;
-            const y = s.y * cell + cell / 2;
-            const angle = (s.angle || 0) + performance.now() / 1000;
+        for (var s of game.powerStones) {
+            if (!game.revealedCells[s.y] || !game.revealedCells[s.y][s.x]) continue;
+            var x = s.x * cell + cell / 2;
+            var y = s.y * cell + cell / 2;
+            var angle = (s.angle || 0) + performance.now() / 1000;
             ctx.save();
             ctx.translate(x, y);
             ctx.rotate(angle);
@@ -167,10 +181,10 @@ const Renderer = {
         }
 
         // Pedras falsas
-        for (let f of game.fakeStones) {
-            if (!game.revealedCells[f.y]?.[f.x]) continue;
-            const x = f.x * cell + cell / 2;
-            const y = f.y * cell + cell / 2;
+        for (var f of game.fakeStones) {
+            if (!game.revealedCells[f.y] || !game.revealedCells[f.y][f.x]) continue;
+            var x = f.x * cell + cell / 2;
+            var y = f.y * cell + cell / 2;
             ctx.shadowColor = '#e74c3c';
             ctx.shadowBlur = 15;
             ctx.fillStyle = '#e74c3c';
@@ -185,17 +199,17 @@ const Renderer = {
         }
 
         // Vilões
-        for (let v of game.villains) {
-            if (!game.revealedCells[v.y]?.[v.x] && !game.isVulnerable) continue;
-            const progress = v.progress || 1;
-            const animX = v.animX + (v.x - v.animX) * progress;
-            const animY = v.animY + (v.y - v.animY) * progress;
-            const vx = animX * cell + cell / 2;
-            const vy = animY * cell + cell / 2;
-            const r = game.isBoss ? cell * 0.5 : cell * 0.4;
+        for (var v of game.villains) {
+            var revealedVillain = game.revealedCells[v.y] && game.revealedCells[v.y][v.x];
+            if (!revealedVillain && !game.isVulnerable) continue;
+            var progress = v.progress || 1;
+            var animX = v.animX + (v.x - v.animX) * progress;
+            var animY = v.animY + (v.y - v.animY) * progress;
+            var vx = animX * cell + cell / 2;
+            var vy = animY * cell + cell / 2;
+            var r = game.isBoss ? cell * 0.5 : cell * 0.4;
 
-            let shakeX = 0,
-                shakeY = 0;
+            var shakeX = 0, shakeY = 0;
             if (game.isVulnerable) {
                 shakeX = (Math.random() - 0.5) * 4;
                 shakeY = (Math.random() - 0.5) * 4;
@@ -203,14 +217,11 @@ const Renderer = {
 
             ctx.save();
             ctx.translate(vx + shakeX, vy + shakeY);
-
             ctx.shadowBlur = 10;
             ctx.shadowColor = '#333';
-            if (game.isVulnerable) {
-                ctx.fillStyle = '#bdc3c7';
-            } else {
-                ctx.fillStyle = game.isBoss ? '#6c3483' : '#8e44ad';
-            }
+
+            if (game.isVulnerable) ctx.fillStyle = '#bdc3c7';
+            else ctx.fillStyle = game.isBoss ? '#6c3483' : '#8e44ad';
             ctx.beginPath();
             ctx.arc(0, 0, r, 0, 2 * Math.PI);
             ctx.fill();
@@ -218,13 +229,13 @@ const Renderer = {
             if (!game.isVulnerable) {
                 ctx.strokeStyle = '#f1c40f';
                 ctx.lineWidth = 2;
-                for (let i = -3; i <= 3; i++) {
+                for (var i = -3; i <= 3; i++) {
                     ctx.beginPath();
                     ctx.ellipse(i * 4, 0, 2, r - 2, i * 0.2, 0, Math.PI * 2);
                     ctx.stroke();
                 }
                 if (game.isBoss) {
-                    for (let i = 0; i < v.hp; i++) {
+                    for (var i = 0; i < v.hp; i++) {
                         ctx.fillStyle = '#f1c40f';
                         ctx.beginPath();
                         ctx.arc(-r * 0.6 + i * 8, -r + 6, 3, 0, 2 * Math.PI);
@@ -256,13 +267,12 @@ const Renderer = {
             ctx.fill();
             ctx.stroke();
 
-            // Olhos
-            const angleToPlayer = Math.atan2(
+            // Olhos (seguem o jogador)
+            var angleToPlayer = Math.atan2(
                 (game.player.y * cell + cell / 2) - vy,
                 (game.player.x * cell + cell / 2) - vx
             );
-            const eyeOffset = 4;
-            const pupilOffset = 2;
+            var eyeOffset = 4, pupilOffset = 2;
             ctx.shadowBlur = 0;
             ctx.fillStyle = '#fff';
             ctx.beginPath();
@@ -273,8 +283,8 @@ const Renderer = {
             ctx.fill();
 
             ctx.fillStyle = game.isVulnerable ? '#c0392b' : '#e74c3c';
-            const px2 = Math.cos(angleToPlayer) * pupilOffset;
-            const py2 = Math.sin(angleToPlayer) * pupilOffset;
+            var px2 = Math.cos(angleToPlayer) * pupilOffset;
+            var py2 = Math.sin(angleToPlayer) * pupilOffset;
             ctx.beginPath();
             ctx.arc(-eyeOffset + px2, -r + 2 + py2, 2.5, 0, 2 * Math.PI);
             ctx.fill();
@@ -303,16 +313,16 @@ const Renderer = {
         }
 
         // Herói
-        const progress = game.playerAnim.progress || 1;
-        const animX = game.playerAnim.x + (game.player.x - game.playerAnim.x) * progress;
-        const animY = game.playerAnim.y + (game.player.y - game.playerAnim.y) * progress;
-        const px = animX * cell + cell / 2;
-        const py = animY * cell + cell / 2;
+        var pProgress = game.playerAnim.progress || 1;
+        var pAnimX = game.playerAnim.x + (game.player.x - game.playerAnim.x) * pProgress;
+        var pAnimY = game.playerAnim.y + (game.player.y - game.playerAnim.y) * pProgress;
+        var px = pAnimX * cell + cell / 2;
+        var py = pAnimY * cell + cell / 2;
 
-        const progressData = SaveManager.getProgress();
-        const equippedSkin = progressData.equippedSkin || 0;
-        const color = getHeroColor(game.selectedHero, equippedSkin);
-        const heroData = getHeroData(game.selectedHero);
+        var progressData = SaveManager.getProgress();
+        var equippedSkin = progressData.equippedSkin || 0;
+        var color = getHeroColor(game.selectedHero, equippedSkin);
+        var heroData = getHeroData(game.selectedHero);
 
         ctx.shadowBlur = 25;
         ctx.shadowColor = color;
@@ -321,9 +331,8 @@ const Renderer = {
         ctx.arc(px, py, cell * 0.35, 0, 2 * Math.PI);
         ctx.fill();
 
-        // Emoji do herói
         ctx.shadowBlur = 0;
-        ctx.font = `${cell * 0.35}px sans-serif`;
+        ctx.font = cell * 0.35 + 'px sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillStyle = '#fff';
@@ -358,8 +367,8 @@ const Renderer = {
         ctx.shadowBlur = 0;
 
         // Partículas
-        for (let p of game.particles) {
-            const alpha = Math.max(0, p.life / p.maxLife);
+        for (var p of game.particles) {
+            var alpha = Math.max(0, p.life / p.maxLife);
             ctx.globalAlpha = alpha;
             ctx.fillStyle = p.color || '#f1c40f';
             ctx.beginPath();
@@ -368,11 +377,8 @@ const Renderer = {
         }
         ctx.globalAlpha = 1;
 
-        // Fog of War (gradiente suave)
-        const gradFog = ctx.createRadialGradient(
-            px, py, 0,
-            px, py, 3.0 * cell * 1.2
-        );
+        // Fog of War (gradiente)
+        var gradFog = ctx.createRadialGradient(px, py, 0, px, py, 3.0 * cell * 1.2);
         gradFog.addColorStop(0, 'rgba(0,0,0,0)');
         gradFog.addColorStop(0.8, 'rgba(0,0,0,0)');
         gradFog.addColorStop(1, 'rgba(0,0,0,0.6)');
@@ -395,8 +401,8 @@ const Renderer = {
             ctx.fillRect(65, 58, 10, 4);
             ctx.strokeStyle = 'rgba(241,196,15,0.3)';
             ctx.lineWidth = 3;
-            for (let i = 0; i < 12; i++) {
-                const angle = i * Math.PI / 6 + performance.now() / 2000;
+            for (var i = 0; i < 12; i++) {
+                var angle = i * Math.PI / 6 + performance.now() / 2000;
                 ctx.beginPath();
                 ctx.moveTo(70 + Math.cos(angle) * 45, 70 + Math.sin(angle) * 45);
                 ctx.lineTo(70 + Math.cos(angle) * 60, 70 + Math.sin(angle) * 60);
