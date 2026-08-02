@@ -1,41 +1,40 @@
 // ============================================================
-//  VILLAIN - Lógica do vilão
+//  VILLAIN - Lógica do vilão (criação e movimento)
 // ============================================================
-function createVillain(x, y, isBoss = false) {
+function createVillain(x, y, isBoss) {
     return {
-        x, y,
-        animX: x, animY: y,
+        x: x,
+        y: y,
+        animX: x,
+        animY: y,
         progress: 1,
         hp: isBoss ? 3 : 1,
         maxHp: isBoss ? 3 : 1
     };
 }
 
-function moveVillainAStar(villain, targetX, targetY, avoid = []) {
-    const path = MazeGenerator.aStar(villain.x, villain.y, targetX, targetY, avoid);
-    if (path && path.length > 1) {
-        const next = path[1];
-        let occupied = false;
-        // Verifica se a célula está ocupada por outro vilão (passado como referência)
-        // Esta verificação é feita fora da função
-        return { x: next.x, y: next.y };
-    }
-    return null;
-}
-
+// Função auxiliar para encontrar a célula mais distante do jogador
 function getFleeTarget(villain, player, mazeGen) {
-    // Encontra a célula mais distante do jogador
-    let best = { x: villain.x, y: villain.y, dist: 0 };
-    const size = mazeGen.size;
-    for (let y = 0; y < size; y++) {
-        for (let x = 0; x < size; x++) {
+    var best = { x: villain.x, y: villain.y, dist: 0 };
+    var size = mazeGen.size;
+    for (var y = 0; y < size; y++) {
+        for (var x = 0; x < size; x++) {
             if (mazeGen.maze[y][x] === 0) {
-                const d = Utils.dist(x, y, player.x, player.y);
+                var d = Utils.dist(x, y, player.x, player.y);
                 if (d > best.dist) {
-                    best = { x, y, dist: d };
+                    best = { x: x, y: y, dist: d };
                 }
             }
         }
     }
     return best;
+}
+
+// Movimento do vilão usando A*
+function moveVillainAStar(villain, targetX, targetY, avoid, mazeGen) {
+    var path = mazeGen.aStar(villain.x, villain.y, targetX, targetY, avoid);
+    if (path && path.length > 1) {
+        return { x: path[1].x, y: path[1].y };
+    }
+    return null;
 }
