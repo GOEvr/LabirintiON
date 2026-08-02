@@ -1,17 +1,17 @@
 // ============================================================
-//  SAVE - Gerenciador de progresso
+//  SAVE - Gerenciador de progresso (localStorage)
 // ============================================================
-const SaveManager = {
-    get(key, defaultVal) {
-        const data = localStorage.getItem('labirintion_' + key);
+var SaveManager = {
+    get: function(key, defaultVal) {
+        var data = localStorage.getItem('labirintion_' + key);
         return data ? JSON.parse(data) : defaultVal;
     },
 
-    set(key, val) {
+    set: function(key, val) {
         localStorage.setItem('labirintion_' + key, JSON.stringify(val));
     },
 
-    getProgress() {
+    getProgress: function() {
         return {
             level: this.get('level', 0),
             totalScore: this.get('totalScore', 0),
@@ -23,7 +23,7 @@ const SaveManager = {
         };
     },
 
-    saveProgress(p) {
+    saveProgress: function(p) {
         this.set('level', p.level);
         this.set('totalScore', p.totalScore);
         this.set('coins', p.coins);
