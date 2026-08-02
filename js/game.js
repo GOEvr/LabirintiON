@@ -1,7 +1,8 @@
 // ============================================================
 //  GAME - Estado principal do jogo
+//  (Inclui: animSpeed 14, interpolação com Math.min, teclas independentes)
 // ============================================================
-const Game = {
+var Game = {
     // Estado
     player: { x: 1, y: 1 },
     playerAnim: { x: 1, y: 1, progress: 1 },
@@ -31,7 +32,7 @@ const Game = {
     elapsedTime: 0,
     currentLevel: 0,
     currentSize: 15,
-    villainSpeed: 0.5,
+    villainSpeed: 0.35,
     stoneCount: 3,
     revealedCells: [],
     hasDashed: false,
@@ -43,7 +44,7 @@ const Game = {
     ctx: null,
     uiElements: {},
 
-    init(canvasId) {
+    init: function(canvasId) {
         this.canvas = document.getElementById(canvasId);
         this.ctx = this.canvas.getContext('2d');
         this.uiElements = {
@@ -58,28 +59,23 @@ const Game = {
             storyText: document.getElementById('storyText')
         };
         console.log('Game inicializado');
-        return this;
     },
 
-    startLevel(levelIndex, heroIndex) {
+    startLevel: function(levelIndex, heroIndex) {
         console.log('Iniciando nível', levelIndex, 'com herói', heroIndex);
         this.currentLevel = levelIndex;
         this.selectedHero = heroIndex;
         this.levelDef = LevelDefinitions[levelIndex];
-        if (!this.levelDef) {
-            console.error('Nível não encontrado!', levelIndex);
-            return;
-        }
+        if (!this.levelDef) { console.error('Nível não encontrado!'); return; }
         this.isBoss = this.levelDef.isBoss || false;
         this.bossPhase = 1;
 
         MazeGenerator.generate(this.levelDef.size, this.levelDef);
         this.currentSize = MazeGenerator.size;
-        this.doors = MazeGenerator.doors.map(d => ({ ...d }));
-        this.spikes = MazeGenerator.spikes.map(s => ({ ...s }));
-        this.fakeStones = MazeGenerator.fakeStones.map(f => ({ ...f }));
+        this.doors = MazeGenerator.doors.slice();
+        this.spikes = MazeGenerator.spikes.slice();
+        this.fakeStones = MazeGenerator.fakeStones.slice();
 
-        // Reset
         this.player.x = 1;
         this.player.y = 1;
         this.playerAnim.x = 1;
@@ -100,48 +96,43 @@ const Game = {
         this.doorCollectCount = 0;
         this.lives = 3;
         this.score = 0;
-        const heroData = getHeroData(heroIndex);
+        var heroData = getHeroData(heroIndex);
         this.vulDuration = this.levelDef.vulDuration + (heroData.vulBonus || 0);
         this.villainSpeed = this.levelDef.villainSpeed;
         this.stoneCount = this.levelDef.stoneCount;
 
-        this.revealedCells = Array.from({ length: this.currentSize }, () =>
-            Array(this.currentSize).fill(false)
-        );
-        this.revealAround(this.player.x, this.player.y, 3);
+        // Revelação inicial
+        this.revealedCells = [];
+        for (var i = 0; i < this.currentSize; i++) {
+            this.revealedCells[i] = [];
+            for (var j = 0; j < this.currentSize; j++) {
+                this.revealedCells[i][j] = false;
+            }
+        }
+        this.revealAround(1, 1, 3);
 
-        // Vilões
-        for (let i = 0; i < this.levelDef.villainCount; i++) {
-            let vx = this.currentSize - 2 - i * 2;
-            let vy = this.currentSize - 2 - i;
+        // Criar vilões
+        for (var i = 0; i < this.levelDef.villainCount; i++) {
+            var vx = this.currentSize - 2 - i * 2;
+            var vy = this.currentSize - 2 - i;
             if (vx < 1) vx = this.currentSize - 2;
             this.villains.push(createVillain(vx, vy, this.isBoss));
         }
 
-        // Pedras
-        for (let i = 0; i < this.stoneCount; i++) {
-            let pos = MazeGenerator.randomEmptyCell([
-                this.player,
-                ...this.villains,
-                ...this.powerStones,
-                ...this.flowers
-            ]);
+        // Criar pedras
+        for (var i = 0; i < this.stoneCount; i++) {
+            var pos = MazeGenerator.randomEmptyCell([this.player].concat(this.villains, this.powerStones, this.flowers));
             this.powerStones.push({ x: pos.x, y: pos.y, angle: Math.random() * 2 * Math.PI });
         }
 
         // Flores
-        for (let i = 0; i < 6; i++) {
-            let pos = MazeGenerator.randomEmptyCell([
-                this.player,
-                ...this.villains,
-                ...this.powerStones,
-                ...this.flowers
-            ]);
+        for (var i = 0; i < 6; i++) {
+            var pos = MazeGenerator.randomEmptyCell([this.player].concat(this.villains, this.powerStones, this.flowers));
             this.flowers.push({ x: pos.x, y: pos.y, phase: Math.random() * 2 * Math.PI });
         }
 
         // Pássaros
-        for (let i = 0; i < 3; i++) {
+        for (var i = 0; i < 3; i++) {
             this.birds.push({
                 x: Math.random() * this.canvas.width,
                 y: Math.random() * this.canvas.height * 0.3,
@@ -153,22 +144,22 @@ const Game = {
         this.startTime = performance.now();
         this.elapsedTime = 0;
 
-        const storyEl = this.uiElements.storyText;
+        var storyEl = this.uiElements.storyText;
         storyEl.classList.remove('hide');
         storyEl.textContent = '📖 ' + this.levelDef.story;
-        setTimeout(() => storyEl.classList.add('hide'), 4000);
+        var self = this;
+        setTimeout(function() { storyEl.classList.add('hide'); }, 4000);
 
         this.updateUI();
         document.getElementById('resultModal').classList.add('hide');
-        document.getElementById('completeModal').classList.add('hide');
         this.gameRunning = true;
         console.log('Nível iniciado com sucesso');
     },
 
-    revealAround(x, y, radius) {
-        for (let dy = -radius; dy <= radius; dy++) {
-            for (let dx = -radius; dx <= radius; dx++) {
-                const cx = x + dx, cy = y + dy;
+    revealAround: function(x, y, radius) {
+        for (var dy = -radius; dy <= radius; dy++) {
+            for (var dx = -radius; dx <= radius; dx++) {
+                var cx = x + dx, cy = y + dy;
                 if (cx >= 0 && cx < this.currentSize && cy >= 0 && cy < this.currentSize) {
                     if (Math.abs(dx) + Math.abs(dy) <= radius) {
                         this.revealedCells[cy][cx] = true;
@@ -179,20 +170,19 @@ const Game = {
     },
 
     // ===== MOVIMENTO DO JOGADOR =====
-    movePlayer(dx, dy) {
+    movePlayer: function(dx, dy) {
         if (!this.gameRunning || this.gameWin) return;
-        const heroData = getHeroData(this.selectedHero);
-        let speedFactor = heroData.speedBonus || 1;
-        let newX = this.player.x + dx;
-        let newY = this.player.y + dy;
-
+        var heroData = getHeroData(this.selectedHero);
+        var speedFactor = heroData.speedBonus || 1;
+        var newX = this.player.x + dx;
+        var newY = this.player.y + dy;
         if (newX < 0 || newX >= this.currentSize || newY < 0 || newY >= this.currentSize) return;
 
         // Parede com dash
         if (MazeGenerator.maze[newY][newX] === 1) {
             if (heroData.dash && !this.hasDashed) {
                 this.hasDashed = true;
-                let nextX = newX + dx, nextY = newY + dy;
+                var nextX = newX + dx, nextY = newY + dy;
                 if (nextX >= 0 && nextX < this.currentSize && nextY >= 0 && nextY < this.currentSize &&
                     MazeGenerator.maze[nextY][nextX] === 0) {
                     this.player.x = nextX;
@@ -211,15 +201,18 @@ const Game = {
         }
 
         // Portas
-        for (let d of this.doors) {
+        for (var d of this.doors) {
             if (d.x === newX && d.y === newY && !d.open) return;
         }
 
         // Espinhos
-        let onSpike = this.spikes.some(s => s.x === newX && s.y === newY);
+        var onSpike = false;
+        for (var s of this.spikes) {
+            if (s.x === newX && s.y === newY) { onSpike = true; break; }
+        }
         if (onSpike) speedFactor *= 0.6;
 
-        // Move
+        // Movimento
         this.player.x = newX;
         this.player.y = newY;
         this.playerAnim.x = this.player.x - dx;
@@ -228,7 +221,7 @@ const Game = {
         this.revealAround(this.player.x, this.player.y, 3);
 
         // Coletar pedras
-        for (let i = this.powerStones.length - 1; i >= 0; i--) {
+        for (var i = this.powerStones.length - 1; i >= 0; i--) {
             if (this.powerStones[i].x === this.player.x && this.powerStones[i].y === this.player.y) {
                 this.powerStones.splice(i, 1);
                 this.score += 100;
@@ -237,15 +230,10 @@ const Game = {
                 this.vulTimer = this.vulDuration;
                 this.isSunny = true;
                 this.spikes = [];
-                for (let d of this.doors) d.open = true;
+                for (var d of this.doors) d.open = true;
                 this.villainSpeed = this.levelDef.villainSpeed * 0.7;
                 while (this.powerStones.length < this.stoneCount) {
-                    let pos = MazeGenerator.randomEmptyCell([
-                        this.player,
-                        ...this.villains,
-                        ...this.powerStones,
-                        ...this.flowers
-                    ]);
+                    var pos = MazeGenerator.randomEmptyCell([this.player].concat(this.villains, this.powerStones, this.flowers));
                     this.powerStones.push({ x: pos.x, y: pos.y, angle: Math.random() * 2 * Math.PI });
                 }
                 this.doorCollectCount++;
@@ -255,7 +243,7 @@ const Game = {
         }
 
         // Pedras falsas
-        for (let i = this.fakeStones.length - 1; i >= 0; i--) {
+        for (var i = this.fakeStones.length - 1; i >= 0; i--) {
             if (this.fakeStones[i].x === this.player.x && this.fakeStones[i].y === this.player.y) {
                 this.fakeStones.splice(i, 1);
                 this.spawnParticles(this.player.x, this.player.y, '#e74c3c', 20);
@@ -272,7 +260,7 @@ const Game = {
 
         // Captura (vulnerável)
         if (this.isVulnerable) {
-            for (let v of this.villains) {
+            for (var v of this.villains) {
                 if (this.player.x === v.x && this.player.y === v.y) {
                     if (this.isBoss) {
                         v.hp--;
@@ -282,7 +270,7 @@ const Game = {
                             AudioManager.victory();
                             this.spawnParticles(this.player.x, this.player.y, '#f1c40f', 50);
                             this.screenShake = 0.8;
-                            const bonus = this.bossPhase * 200;
+                            var bonus = this.bossPhase * 200;
                             this.score += 500 + bonus;
                             this.coins += 10 + this.bossPhase * 5;
                             this.showResult(true);
@@ -290,7 +278,7 @@ const Game = {
                             this.bossPhase++;
                             this.screenShake = 0.5;
                             AudioManager.boss();
-                            let empty = MazeGenerator.randomEmptyCell([this.player, ...this.villains]);
+                            var empty = MazeGenerator.randomEmptyCell([this.player].concat(this.villains));
                             v.x = empty.x;
                             v.y = empty.y;
                             v.animX = v.x;
@@ -305,8 +293,8 @@ const Game = {
                         AudioManager.victory();
                         this.spawnParticles(this.player.x, this.player.y, '#f1c40f', 40);
                         this.screenShake = 0.8;
-                        const timeBonus = Math.max(0, 300 - Math.floor(this.elapsedTime));
-                        const livesBonus = this.lives * 50;
+                        var timeBonus = Math.max(0, 300 - Math.floor(this.elapsedTime));
+                        var livesBonus = this.lives * 50;
                         this.score += 500 + timeBonus + livesBonus;
                         this.coins += 5;
                         this.showResult(true);
@@ -318,7 +306,7 @@ const Game = {
 
         // Colisão com vilão (não vulnerável)
         if (!this.isVulnerable) {
-            for (let v of this.villains) {
+            for (var v of this.villains) {
                 if (this.player.x === v.x && this.player.y === v.y) {
                     this.lives--;
                     AudioManager.hit();
@@ -332,7 +320,7 @@ const Game = {
                         this.playerAnim.x = 1;
                         this.playerAnim.y = 1;
                         this.playerAnim.progress = 1;
-                        for (let i = 0; i < this.villains.length; i++) {
+                        for (var i = 0; i < this.villains.length; i++) {
                             this.villains[i].x = this.currentSize - 2 - i * 2;
                             this.villains[i].y = this.currentSize - 2 - i;
                             this.villains[i].animX = this.villains[i].x;
@@ -340,13 +328,8 @@ const Game = {
                             this.villains[i].progress = 1;
                         }
                         this.powerStones = [];
-                        for (let i = 0; i < this.stoneCount; i++) {
-                            let pos = MazeGenerator.randomEmptyCell([
-                                this.player,
-                                ...this.villains,
-                                ...this.powerStones,
-                                ...this.flowers
-                            ]);
+                        for (var i = 0; i < this.stoneCount; i++) {
+                            var pos = MazeGenerator.randomEmptyCell([this.player].concat(this.villains, this.powerStones, this.flowers));
                             this.powerStones.push({ x: pos.x, y: pos.y, angle: Math.random() * 2 * Math.PI });
                         }
                         this.isVulnerable = false;
@@ -362,27 +345,27 @@ const Game = {
     },
 
     // ===== MOVIMENTO DO VILÃO =====
-    moveVillain(index) {
+    moveVillain: function(index) {
         if (!this.gameRunning || this.gameWin) return;
-        const v = this.villains[index];
+        var v = this.villains[index];
         if (!v) return;
 
-        let targetX = this.player.x, targetY = this.player.y;
-        let avoid = [];
+        var targetX = this.player.x, targetY = this.player.y;
+        var avoid = [];
 
         if (this.isVulnerable) {
-            // Fuga: busca célula mais distante do jogador
-            const fleeTarget = getFleeTarget(v, this.player, MazeGenerator);
+            // Fuga: célula mais distante do jogador
+            var fleeTarget = getFleeTarget(v, this.player, MazeGenerator);
             targetX = fleeTarget.x;
             targetY = fleeTarget.y;
             avoid = [this.player];
         }
 
-        const step = moveVillainAStar(v, targetX, targetY, avoid);
+        var step = moveVillainAStar(v, targetX, targetY, avoid, MazeGenerator);
         if (step) {
-            let occupied = false;
-            for (let other of this.villains) {
-                if (other !== v && other.x === step.x && other.y === step.y) occupied = true;
+            var occupied = false;
+            for (var other of this.villains) {
+                if (other !== v && other.x === step.x && other.y === step.y) { occupied = true; break; }
             }
             if (!occupied) {
                 v.animX = v.x;
@@ -407,7 +390,7 @@ const Game = {
                 this.playerAnim.x = 1;
                 this.playerAnim.y = 1;
                 this.playerAnim.progress = 1;
-                for (let i = 0; i < this.villains.length; i++) {
+                for (var i = 0; i < this.villains.length; i++) {
                     this.villains[i].x = this.currentSize - 2 - i * 2;
                     this.villains[i].y = this.currentSize - 2 - i;
                     this.villains[i].animX = this.villains[i].x;
@@ -415,13 +398,8 @@ const Game = {
                     this.villains[i].progress = 1;
                 }
                 this.powerStones = [];
-                for (let i = 0; i < this.stoneCount; i++) {
-                    let pos = MazeGenerator.randomEmptyCell([
-                        this.player,
-                        ...this.villains,
-                        ...this.powerStones,
-                        ...this.flowers
-                    ]);
+                for (var i = 0; i < this.stoneCount; i++) {
+                    var pos = MazeGenerator.randomEmptyCell([this.player].concat(this.villains, this.powerStones, this.flowers));
                     this.powerStones.push({ x: pos.x, y: pos.y, angle: Math.random() * 2 * Math.PI });
                 }
                 this.isVulnerable = false;
@@ -432,9 +410,10 @@ const Game = {
         }
     },
 
-    spawnParticles(x, y, color, count = 10) {
-        const cell = this.canvas.width / this.currentSize;
-        for (let i = 0; i < count; i++) {
+    spawnParticles: function(x, y, color, count) {
+        count = count || 10;
+        var cell = this.canvas.width / this.currentSize;
+        for (var i = 0; i < count; i++) {
             this.particles.push({
                 x: x * cell + cell / 2,
                 y: y * cell + cell / 2,
@@ -448,20 +427,21 @@ const Game = {
         }
     },
 
-    updateUI() {
-        const ui = this.uiElements;
-        const heroData = getHeroData(this.selectedHero);
+    updateUI: function() {
+        var ui = this.uiElements;
+        var heroData = getHeroData(this.selectedHero);
         ui.heroName.textContent = '👤 ' + heroData.name;
-        ui.lives.innerHTML = '❤️'.repeat(Math.max(0, this.lives)) +
-            '🖤'.repeat(Math.max(0, 3 - this.lives));
-        ui.status.textContent = this.isVulnerable ? '🛡️ Quebrado!' :
-            (this.gameWin ? '🏆' : '☁️ Fechado');
+        var hearts = '';
+        for (var i = 0; i < this.lives; i++) hearts += '❤️';
+        for (var i = this.lives; i < 3; i++) hearts += '🖤';
+        ui.lives.innerHTML = hearts;
+        ui.status.textContent = this.isVulnerable ? '🛡️ Quebrado!' : (this.gameWin ? '🏆' : '☁️ Fechado');
         ui.stoneCount.textContent = '💎 ' + this.powerStones.length;
         ui.timer.textContent = '⏱️ ' + Utils.formatTime(this.elapsedTime);
         ui.levelHud.textContent = this.levelDef ? this.levelDef.label : 'Nível ' + (this.currentLevel + 1);
 
         if (this.isVulnerable) {
-            const pct = (this.vulTimer / this.vulDuration) * 100;
+            var pct = (this.vulTimer / this.vulDuration) * 100;
             ui.vulFill.style.width = Math.min(100, pct) + '%';
             ui.vulFill.style.background = '#f1c40f';
         } else {
@@ -469,61 +449,41 @@ const Game = {
         }
 
         // Batimentos
-        let minDist = Infinity;
-        for (let v of this.villains) {
-            const d = Utils.dist(v.x, v.y, this.player.x, this.player.y);
+        var minDist = Infinity;
+        for (var v of this.villains) {
+            var d = Utils.dist(v.x, v.y, this.player.x, this.player.y);
             if (d < minDist) minDist = d;
         }
-        const heartbeatEl = ui.heartbeat;
+        var hb = ui.heartbeat;
         if (minDist <= 4 && minDist !== Infinity) {
-            const intensity = 1 - (minDist / 4);
-            const scale = 1 + intensity * 0.8;
-            heartbeatEl.style.transform = `scale(${scale})`;
-            heartbeatEl.style.color = intensity > 0.6 ? '#e74c3c' : '#ff6b6b';
+            var intensity = 1 - (minDist / 4);
+            var scale = 1 + intensity * 0.8;
+            hb.style.transform = 'scale(' + scale + ')';
+            hb.style.color = intensity > 0.6 ? '#e74c3c' : '#ff6b6b';
             if (minDist <= 2 && Math.random() < 0.3) AudioManager.heartbeat();
         } else {
-            heartbeatEl.style.transform = 'scale(1)';
-            heartbeatEl.style.color = '#e74c3c';
+            hb.style.transform = 'scale(1)';
+            hb.style.color = '#e74c3c';
         }
     },
 
-    showResult(win) {
-        const modal = document.getElementById('resultModal');
-        const completeModal = document.getElementById('completeModal');
-
-        // Se venceu e é o último nível
-        if (win && this.currentLevel === LevelDefinitions.length - 1) {
-            modal.classList.add('hide');
-            completeModal.classList.remove('hide');
-            document.getElementById('finalScore').textContent = '⭐ ' + this.score;
-            document.getElementById('finalStats').textContent =
-                '⏱️ ' + Utils.formatTime(this.elapsedTime) + ' | ❤️ ' + this.lives + ' vidas | 🪙 ' + this.coins + ' moedas';
-            AudioManager.complete();
-            // Salvar progresso
-            const progress = SaveManager.getProgress();
-            progress.totalScore += this.score;
-            progress.coins += this.coins;
-            if (this.elapsedTime < progress.bestTime) progress.bestTime = this.elapsedTime;
-            SaveManager.saveProgress(progress);
-            return;
-        }
-
+    showResult: function(win) {
+        var modal = document.getElementById('resultModal');
         modal.classList.remove('hide');
-        const title = document.getElementById('resultTitle');
-        const scoreEl = document.getElementById('resultScore');
-        const stats = document.getElementById('resultStats');
-        const best = document.getElementById('resultBestTime');
-        const coinsEl = document.getElementById('resultCoins');
+        var title = document.getElementById('resultTitle');
+        var scoreEl = document.getElementById('resultScore');
+        var stats = document.getElementById('resultStats');
+        var best = document.getElementById('resultBestTime');
+        var coinsEl = document.getElementById('resultCoins');
 
         if (win) {
             title.textContent = '🏆 Vitória!';
             title.style.color = '#f1c40f';
-            const progress = SaveManager.getProgress();
-            progress.totalScore += this.score;
+            var progress = SaveManager.getProgress();
             progress.coins += this.coins;
             if (this.elapsedTime < progress.bestTime) progress.bestTime = this.elapsedTime;
             if (this.currentLevel + 1 > progress.level) progress.level = this.currentLevel + 1;
-            if (this.currentLevel % 3 === 2 && !progress.unlockedSkins.includes(1)) {
+            if (this.currentLevel % 3 === 2 && progress.unlockedSkins.indexOf(1) === -1) {
                 progress.unlockedSkins.push(1);
             }
             SaveManager.saveProgress(progress);
@@ -533,18 +493,18 @@ const Game = {
             title.style.color = '#e74c3c';
         }
         scoreEl.textContent = '⭐ ' + this.score;
-        stats.innerHTML = `⏱️ ${Utils.formatTime(this.elapsedTime)} &nbsp;|&nbsp; ❤️ ${this.lives} vidas`;
+        stats.innerHTML = '⏱️ ' + Utils.formatTime(this.elapsedTime) + ' &nbsp;|&nbsp; ❤️ ' + this.lives + ' vidas';
+
         if (win) {
-            const bestTime = SaveManager.getProgress().bestTime;
-            best.textContent = '🏅 Melhor tempo: ' +
-                (bestTime < Infinity ? Utils.formatTime(bestTime) : '--');
+            var bestTime = SaveManager.getProgress().bestTime;
+            best.textContent = '🏅 Melhor tempo: ' + (bestTime < Infinity ? Utils.formatTime(bestTime) : '--');
             coinsEl.textContent = '🪙 +' + this.coins + ' moedas';
         } else {
             best.textContent = '';
             coinsEl.textContent = '';
         }
 
-        const nextBtn = document.getElementById('nextLevelBtn');
+        var nextBtn = document.getElementById('nextLevelBtn');
         if (win && this.currentLevel < LevelDefinitions.length - 1) {
             nextBtn.style.display = 'inline-block';
             nextBtn.textContent = 'Próximo Nível';
@@ -557,7 +517,8 @@ const Game = {
         }
     },
 
-    update(delta) {
+    // ===== LOOP PRINCIPAL (update) =====
+    update: function(delta) {
         if (!this.gameRunning && !this.gameWin) return;
 
         if (this.gameRunning) {
@@ -581,42 +542,53 @@ const Game = {
             this.villainMoveTimer += delta;
             if (this.villainMoveTimer >= this.villainSpeed) {
                 this.villainMoveTimer = 0;
-                for (let i = 0; i < this.villains.length; i++) {
+                for (var i = 0; i < this.villains.length; i++) {
                     this.moveVillain(i);
                 }
             }
         }
 
-        // Animação de deslize
-        const animSpeed = 6.0;
+        // ==========================================================
+        //  🆕 2º e 3º PASSOS: MOVIMENTO MAIS SUAVE
+        //  AnimSpeed aumentado para 14.0 e interpolação com Math.min
+        // ==========================================================
+        var animSpeed = 14.0;  // ANTES: 6.0 → agora mais fluido
+
         if (this.playerAnim.progress < 1) {
-            this.playerAnim.progress += delta * animSpeed;
-            if (this.playerAnim.progress > 1) this.playerAnim.progress = 1;
+            this.playerAnim.progress = Math.min(1, this.playerAnim.progress + delta * animSpeed);
         }
-        for (let v of this.villains) {
+        for (var v of this.villains) {
             if (v.progress < 1) {
-                v.progress += delta * animSpeed;
-                if (v.progress > 1) v.progress = 1;
+                v.progress = Math.min(1, v.progress + delta * animSpeed);
             }
         }
 
-        // Movimento do jogador
+        // ==========================================================
+        //  🆕 5º PASSO: TECLAS INDEPENDENTES (SEM else if)
+        //  Permite prioridade da última tecla pressionada
+        // ==========================================================
         if (this.moveCooldown <= 0 && this.gameRunning && !this.gameWin) {
-            const heroData = getHeroData(this.selectedHero);
-            const delay = 0.12 / (heroData.speedBonus || 1);
-            const keys = this.keys;
-            if (keys.up) { this.movePlayer(0, -1);
-                this.moveCooldown = delay; } else if (keys.down) { this.movePlayer(0, 1);
-                this.moveCooldown = delay; } else if (keys.left) { this.movePlayer(-1, 0);
-                this.moveCooldown = delay; } else if (keys.right) { this.movePlayer(1, 0);
-                this.moveCooldown = delay; }
+            var heroData = getHeroData(this.selectedHero);
+            var delay = 0.12 / (heroData.speedBonus || 1);
+            var keys = this.keys;
+
+            // Agora cada tecla é verificada independentemente
+            if (keys.up) this.movePlayer(0, -1);
+            if (keys.down) this.movePlayer(0, 1);
+            if (keys.left) this.movePlayer(-1, 0);
+            if (keys.right) this.movePlayer(1, 0);
+
+            // Aplica o cooldown se pelo menos uma tecla estiver pressionada
+            if (keys.up || keys.down || keys.left || keys.right) {
+                this.moveCooldown = delay;
+            }
         } else {
             this.moveCooldown -= delta;
         }
 
-        // Partículas
-        for (let i = this.particles.length - 1; i >= 0; i--) {
-            const p = this.particles[i];
+        // Atualizar partículas
+        for (var i = this.particles.length - 1; i >= 0; i--) {
+            var p = this.particles[i];
             p.x += p.vx * delta;
             p.y += p.vy * delta;
             p.life -= delta;
@@ -624,7 +596,7 @@ const Game = {
         }
 
         // Pássaros
-        for (let b of this.birds) {
+        for (var b of this.birds) {
             b.x += Math.sin(b.phase + performance.now() / 1000) * b.speed * delta;
             b.y += Math.cos(b.phase * 0.7 + performance.now() / 1500) * 20 * delta;
             if (b.x > this.canvas.width) b.x = 0;
@@ -637,7 +609,8 @@ const Game = {
         if (this.screenShake < 0) this.screenShake = 0;
     },
 
-    render() {
+    render: function() {
+        // Delega a renderização para o módulo Renderer
         Renderer.render(this);
     }
 };
